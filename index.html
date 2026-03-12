@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Euclid I.38 — Interactive Statement–Reason Proof</title>
+  <style>
+    :root {
+      --ink: #1f2937;
+      --muted: #606b7d;
+      --accent: #2b6cb0;      /* blue */
+      --accent-2: #d97706;    /* amber */
+      --bg: #f9fafb;
+      --hilite: #ef4444;      /* red */
+      --good: #16a34a;        /* green */
+      --focus: #7c3aed;       /* violet */
+    }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
+    .header { padding: 1rem 1.25rem; background: white; border-bottom: 1px solid #e5e7eb; }
+    .header h1 { margin: 0; font-size: 1.6rem; }
+    .subtitle { margin: .25rem 0 0; color: var(--muted); }
+    main.layout { display: grid; grid-template-columns: 1fr; gap: 1rem; padding: 1rem; max-width: 1200px; margin: 0 auto; }
+    @media (min-width: 980px) { main.layout { grid-template-columns: 1fr 1fr; } }
+    .board { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: .75rem; }
+    .controls { display: flex; gap: .5rem; align-items: center; margin-bottom: .5rem; flex-wrap: wrap; }
+    button { padding: .5rem .75rem; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; cursor: pointer; }
+    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .muted { color: var(--muted); }
+    svg { width: 100%; height: auto; border-radius: 6px; background: #fff; display: block; }
+    .legend { font-size: .9rem; margin-top: .4rem; color: var(--muted); }
+    .steps { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; }
+    .guiding { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: .75rem .9rem; margin-bottom: 1rem; }
+    .guiding h2 { margin: .2rem 0 .4rem; font-size: 1.05rem; }
+
+    .tchart-wrap { overflow-x: auto; }
+    .tchart { width: 100%; border-collapse: collapse; }
+    .tchart thead th { text-align: left; font-weight: 700; color: var(--accent); border-bottom: 2px solid #e5e7eb; padding: .5rem .6rem; background: #f9fafb; position: sticky; top: 0; z-index: 1; }
+    .tchart tbody td { border-bottom: 1px solid #f1f5f9; padding: .6rem .6rem; vertical-align: top; }
+    .tchart tbody tr { cursor: pointer; }
+    .tchart tbody tr:hover { background: #f8fafc; }
+    .tchart tbody tr.active { background: #eef2ff; outline: 2px solid #e0e7ff; }
+    .tchart .col-statement { width: 60%; }
+    .tchart .col-reason { width: 40%; }
+    .badge { display: inline-block; padding: 0.15rem .4rem; border-radius: .4rem; font-size: .8rem; border: 1px solid #e5e7eb; color: #374151; background: #f8fafc; }
+    .badge.given { color: #0b6b1a; background: #e7f6ea; border-color: #c4e7cb; }
+    .badge.det { color: #5b21b6; background: #f3e8ff; border-color: #e9d5ff;}
+    .badge.constr { color: #7a1a0b; background: #fff4ed; border-color: #fde3d3; }
+    .badge.prop { color: #0b3b6b; background: #e9f2ff; border-color: #d7e7ff; }
+    .badge.cn { color: #155e75; background: #ecfeff; border-color: #cffafe; }
+    .badge.thus { color: #065f46; background: #ecfdf5; border-color: #d1fae5; }
+
+    /* Highlights on the diagram */
+    .tick { stroke-linecap: round; }
+    .hidden { opacity: 0; }
+    .fade-in { animation: fade .45s ease-out forwards; }
+    @keyframes fade { from { opacity: 0 } to { opacity: 1 } }
+    .highlight { filter: drop-shadow(0 0 1px #0002); }
+    .hl-strong { stroke: var(--hilite) !important; stroke-width: 4 !important; }
+    .hl-parallelogram { stroke: var(--accent-2) !important; stroke-width: 3 !important; fill: rgba(217,119,6,.08) !important; }
+    .hl-triangle { stroke: var(--good) !important; stroke-width: 3 !important; fill: rgba(22,163,74,.10) !important; }
+
+    /* Focus mode (dims non-highlighted) */
+    svg.focusless * { opacity: .25; transition: opacity .2s; }
+    svg.focusless .highlight { opacity: 1 !important; }
+
+    /* Keyboard focus */
+    [tabindex="0"]:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+    @media print { .controls, .guiding { display: none; } }
+  </style>
+</head>
+<body>
+<header class="header">
+  <h1>Euclid’s Elements — Book I, Proposition 38</h1>
+  <p class="subtitle">Triangles on equal bases and in the same parallels are equal in area.</p>
+</header>
+
+<main class="layout">
+  <!-- Left: Diagram -->
+  <section class="board" aria-label="Interactive diagram">
+    <div class="controls">
+      <button id="btn-prev" aria-label="Previous line">◀ Back</button>
+      <button id="btn-next" class="primary" aria-label="Next line">Next ▶</button>
+      <button id="btn-reset" aria-label="Reset">Reset</button>
+      <button id="btn-play" aria-label="Auto play">▶ Play</button>
+      <button id="btn-focus" aria-label="Toggle focus mode">☼ Focus</button>
+      <span id="step-counter" class="muted" aria-live="polite"></span>
+    </div>
+
+    <!-- SVG Diagram -->
+    <svg id="diagram" viewBox="0 0 840 520" role="img" aria-labelledby="diagramTitle diagramDesc">
+      <title id="diagramTitle">Diagram for Proposition I.38</title>
+      <desc id="diagramDesc">Triangles ABC and DEF on equal bases BC and EF, between parallels BF and AD; parallelograms GBCA and DEFH constructed.</desc>
+
+      <!-- Area hatch pattern -->
+      <defs>
+        <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#16a34a" stroke-width="1"/>
+        </pattern>
+      </defs>
+
+      <!-- Parallels: BF (lower) and AD (upper), drawn as dashed -->
+      <line id="lineBF" x1="40" y1="360" x2="800" y2="360" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6 8" />
+      <line id="lineAD" x1="40" y1="120" x2="800" y2="120" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="6 8" />
+
+      <!-- Triangle ABC (base BC on BF; A on AD) -->
+      <!-- Coordinates chosen to respect construction: A and D on y=120, B C E F on y=360 -->
+      <g id="triA_parts">
+        <line id="BC" x1="140" y1="360" x2="300" y2="360" stroke="#111827" stroke-width="2"/>
+        <line id="CA" x1="300" y1="360" x2="230" y2="120" stroke="#111827" stroke-width="2"/>
+        <line id="AB" x1="230" y1="120" x2="140" y2="360" stroke="#111827" stroke-width="2"/>
+      </g>
+      <!-- Tick for equal base BC -->
+      <line class="tick" id="tickBC" x1="220" y1="355" x2="220" y2="365" stroke="#111827" stroke-width="2"/>
+
+      <!-- Triangle DEF (base EF on BF; D on AD) -->
+      <g id="triD_parts">
+        <line id="EF" x1="520" y1="360" x2="680" y2="360" stroke="#111827" stroke-width="2"/>
+        <line id="DE" x1="610" y1="120" x2="520" y2="360" stroke="#111827" stroke-width="2"/>
+        <line id="DF" x1="610" y1="120" x2="680" y2="360" stroke="#111827" stroke-width="2"/>
+      </g>
+      <!-- Tick for equal base EF -->
+      <line class="tick" id="tickEF" x1="600" y1="355" x2="600" y2="365" stroke="#111827" stroke-width="2"/>
+
+      <!-- Construction lines (hidden until step) -->
+      <!-- BG through B parallel to CA, meeting AD at G -->
+      <line id="lineBG" x1="140" y1="360" x2="70" y2="120" stroke="#6b7280" stroke-width="2" class="hidden" />
+      <!-- FH through F parallel to DE, meeting AD at H -->
+      <line id="lineFH" x1="680" y1="360" x2="770" y2="120" stroke="#6b7280" stroke-width="2" class="hidden" />
+
+      <!-- Diagonals for parallelograms (shown at Prop. 34 step) -->
+      <line id="diagAB" x1="230" y1="120" x2="140" y2="360" stroke="#64748b" stroke-width="2" stroke-dasharray="6 6" class="hidden"/>
+      <line id="diagDF" x1="610" y1="120" x2="680" y2="360" stroke="#64748b" stroke-width="2" stroke-dasharray="6 6" class="hidden"/>
+
+      <!-- Parallelograms on bases BC and EF (hidden until constructed) -->
+      <!-- GBCA: G(70,120) – B(140,360) – C(300,360) – A(230,120) -->
+      <polygon id="paraGBCA" points="70,120 140,360 300,360 230,120" fill="none" stroke="#374151" stroke-width="2" class="hidden"/>
+      <!-- DEFH: D(610,120) – E(520,360) – F(680,360) – H(770,120) -->
+      <polygon id="paraDEFH" points="610,120 520,360 680,360 770,120" fill="none" stroke="#374151" stroke-width="2" class="hidden"/>
+
+      <!-- Labels -->
+      <g id="labels" font-size="16" fill="#374151">
+        <text x="230" y="110">A</text>
+        <text x="140" y="380">B</text>
+        <text x="300" y="380">C</text>
+
+        <text x="610" y="110">D</text>
+        <text x="520" y="380">E</text>
+        <text x="680" y="380">F</text>
+
+        <text x="65"  y="110">G</text>
+        <text x="770" y="110">H</text>
+      </g>
+    </svg>
+    <div class="legend">Tip: Hover or click a proof line to highlight the referenced figure. Use <strong>☼ Focus</strong> to dim non‑relevant parts.</div>
+    <div id="live" aria-live="polite" style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;"></div>
+  </section>
+
+  <!-- Right: Proof T-Chart -->
+  <section class="steps" aria-label="Statement–Reason proof">
+    <aside class="guiding">
+      <h2>Guiding Question</h2>
+      <p>
+        If two triangles stand on <em>equal bases</em> and between the <em>same parallels</em>, how do we use
+        <strong>parallelograms</strong> and earlier results to prove their <strong>areas</strong> are equal?
+      </p>
+      <details>
+        <summary>Need a hint?</summary>
+        <ul>
+          <li><strong>I.36</strong>: Parallelograms on equal bases in the same parallels are equal (in area).</li>
+          <li><strong>I.34</strong>: A diagonal bisects a parallelogram; each triangle cut off is half its parallelogram.</li>
+        </ul>
+      </details>
+    </aside>
+
+    <div class="tchart-wrap">
+      <table class="tchart" role="table" aria-label="Statement–Reason table">
+        <thead>
+          <tr role="row">
+            <th role="columnheader" class="col-statement">Statement</th>
+            <th role="columnheader" class="col-reason">Reason</th>
+          </tr>
+        </thead>
+        <tbody id="proof-body" role="rowgroup">
+          <!-- Rows injected by JS from PROOF[] -->
+        </tbody>
+      </table>
+      <div id="coach" class="muted" style="margin-top:.5rem;"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // -----------------------------
+  // Utility
+  // -----------------------------
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+  // -----------------------------
+  // Diagram API
+  // -----------------------------
+  const Diagram = (function() {
+    function show(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('hidden');
+      el.classList.add('fade-in');
+      setTimeout(() => el.classList.remove('fade-in'), 300);
+    }
+    function addClass(id, ...klasses) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add(...klasses);
+    }
+    function removeClass(id, ...klasses) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove(...klasses);
+    }
+    function clearHighlights() {
+      document.querySelectorAll('.highlight, .hl-strong, .hl-parallelogram, .hl-triangle')
+        .forEach(el => el.classList.remove('highlight','hl-strong','hl-parallelogram','hl-triangle'));
+      // Also remove area hatch if previously added
+      removeClass('triABC','pattern');
+      removeClass('triDEF','pattern');
+    }
+    function reset() {
+      // Hide constructions
+      ['paraGBCA','paraDEFH','lineBG','lineFH','diagAB','diagDF'].forEach(showId => {
+        const el = document.getElementById(showId);
+        if (el) el.classList.add('hidden');
+      });
+      clearHighlights();
+    }
+    return { show, addClass, removeClass, clearHighlights, reset };
+  })();
+
+  // -----------------------------
+  // Proof engine
+  // -----------------------------
+  const Proof = (function() {
+    let current = -1;
+    let autoplay = null;
+    let lines = [];
+    let focusMode = false;
+
+    function ensureVisibility(index) {
+      const vis = lines[index]?.ensureVisible || (()=>{});
+      vis();
+    }
+
+    function announce(texts=[]) {
+      const s = texts.filter(Boolean).join(', ');
+      $('#live').textContent = s ? `Highlighting ${s}.` : '';
+    }
+
+    function scrollIntoViewCentered(el) {
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+
+    function setActive(index) {
+      if (index < 0 || index >= lines.length) return;
+      if (current >= 0) {
+        const prevLine = lines[current];
+        if (prevLine.onDeselect) prevLine.onDeselect();
+        $(`#line-${current}`)?.classList.remove('active');
+      }
+      Diagram.clearHighlights();
+
+      current = index;
+      const row = $(`#line-${index}`);
+      if (row) row.classList.add('active');
+
+      ensureVisibility(index);
+
+      const ids = lines[index].highlights || [];
+      ids.forEach(({ id, mode }) => {
+        const cls = mode === 'para' ? 'hl-parallelogram' : (mode === 'tri' ? 'hl-triangle' : 'hl-strong');
+        Diagram.addClass(id, 'highlight', cls);
+      });
+
+      // Optional per-line effect
+      if (lines[index].onSelect) lines[index].onSelect();
+
+      // Coaching prompt
+      $('#coach').textContent = lines[index].coach || '';
+
+      // Announce for screen readers
+      announce(lines[index].announce);
+
+      // Update counter, hash, scroll, height
+      updateCounter();
+      location.hash = `line-${index}`;
+      scrollIntoViewCentered(row);
+      postHeight();
+    }
+
+    function hover(index, on) {
+      if (index === current) return;
+      const ids = lines[index].highlights || [];
+      ids.forEach(({ id, mode }) => {
+        const cls = mode === 'para' ? 'hl-parallelogram' : (mode === 'tri' ? 'hl-triangle' : 'hl-strong');
+        if (on) Diagram.addClass(id, 'highlight', cls);
+        else Diagram.removeClass(id, 'highlight', cls);
+      });
+    }
+
+    function next() { setActive(Math.min(current + 1, lines.length - 1)); }
+    function prev() { setActive(Math.max(current - 1, 0)); }
+    function reset() {
+      current = -1;
+      Diagram.reset();
+      $$('#proof-body tr').forEach(tr => tr.classList.remove('active'));
+      updateCounter();
+      $('#coach').textContent = '';
+      location.hash = '';
+      postHeight();
+    }
+
+    function play() {
+      stop();
+      autoplay = setInterval(() => {
+        if (current >= lines.length - 1) { stop(); return; }
+        next();
+      }, 1600);
+      $('#btn-play').textContent = '⏸ Pause';
+    }
+    function stop() {
+      if (autoplay) clearInterval(autoplay);
+      autoplay = null;
+      $('#btn-play').textContent = '▶ Play';
+    }
+    function togglePlay() { autoplay ? stop() : play(); }
+
+    function toggleFocus() {
+      focusMode = !focusMode;
+      $('#diagram').classList.toggle('focusless', focusMode);
+      $('#btn-focus').textContent = focusMode ? '☾ Unfocus' : '☼ Focus';
+    }
+
+    function updateCounter() {
+      const counter = $('#step-counter');
+      if (!counter) return;
+      if (current < 0) { counter.textContent = `0 of ${lines.length}`; return; }
+      counter.textContent = `${current + 1} of ${lines.length}`;
+      $('#btn-prev').disabled = current <= 0;
+      $('#btn-next').disabled = current >= lines.length - 1;
+    }
+
+    function bindControls() {
+      $('#btn-next')?.addEventListener('click', next);
+      $('#btn-prev')?.addEventListener('click', prev);
+      $('#btn-reset')?.addEventListener('click', reset);
+      $('#btn-play')?.addEventListener('click', togglePlay);
+      $('#btn-focus')?.addEventListener('click', toggleFocus);
+
+      // Keyboard
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowRight') next();
+        if (e.key === 'ArrowLeft') prev();
+        if (e.key.toLowerCase() === 'r') reset();
+        if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+        if (e.key === 'Home') setActive(0);
+        if (e.key === 'End') setActive(PROOF.length - 1);
+      });
+    }
+
+    function renderProof(data) {
+      lines = data;
+      const tbody = $('#proof-body');
+      tbody.innerHTML = '';
+      data.forEach((line, i) => {
+        const tr = document.createElement('tr');
+        tr.id = `line-${i}`;
+        tr.setAttribute('tabindex','0');
+        tr.setAttribute('role','row');
+        tr.innerHTML = `
+          <td role="cell"><div>${line.statement}</div></td>
+          <td role="cell"><span class="badge ${line.kind}">${line.reasonLabel}</span> ${line.reason || ''}</td>`;
+
+        tr.addEventListener('mouseenter', () => hover(i, true));
+        tr.addEventListener('mouseleave', () => hover(i, false));
+        tr.addEventListener('click', () => setActive(i));
+        tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') setActive(i); });
+        tbody.appendChild(tr);
+      });
+      updateCounter();
+      bindControls();
+      postHeight();
+    }
+
+    return { renderProof, next, prev, reset, setActive };
+  })();
+
+  // -----------------------------
+  // PROOF lines for Euclid I.38 (matching your text)
+  // -----------------------------
+  const PROOF = [
+    {
+      // Proposition 38, Given
+      statement: 'Let <strong>ABC</strong> and <strong>DEF</strong> be triangles on equal bases <strong>BC</strong> and <strong>EF</strong> and in the same parallels <strong>BF</strong> and <strong>AD</strong>.',
+      reasonLabel: 'Given (I.38)',
+      kind: 'given',
+      reason: '',
+      highlights: [
+        { id: 'BC' }, { id: 'EF' }, { id: 'tickBC' }, { id: 'tickEF' },
+        { id: 'lineBF' }, { id: 'lineAD' },
+        { id: 'AB' }, { id: 'CA' }, // outline ABC
+        { id: 'DE' }, { id: 'DF' }  // outline DEF
+      ],
+      ensureVisible: () => { /* bases and triangles already visible */ },
+      coach: 'Both triangles sit between the same pair of parallels and have equal bases.',
+      announce: ['bases BC and EF', 'parallels BF and AD', 'triangles ABC and DEF']
+    },
+    {
+      // Determination ("I say...")
+      statement: 'I say that triangle <strong>ABC</strong> equals triangle <strong>DEF</strong>.',
+      reasonLabel: 'Determination',
+      kind: 'det',
+      reason: '',
+      highlights: [
+        { id: 'AB', mode: 'tri' }, { id: 'CA', mode: 'tri' },
+        { id: 'DE', mode: 'tri' }, { id: 'DF', mode: 'tri' }
+      ],
+      coach: 'This is what we aim to prove: equality of areas.',
+      announce: ['triangle ABC', 'triangle DEF']
+    },
+    {
+      // I.Post.2 Produce AD in both directions to G and H
+      statement: 'Produce <strong>AD</strong> in both directions to <strong>G</strong> and <strong>H</strong>.',
+      reasonLabel: 'I.Post.2',
+      kind: 'constr',
+      reason: 'Produce a finite straight line continuously in a straight line.',
+      ensureVisible: () => { /* AD shown as dashed parallel already */ },
+      highlights: [ { id: 'lineAD' } ],
+      coach: 'Extending AD gives a parallel line (GH) to pair with BF.',
+      announce: ['line AD produced to G and H']
+    },
+    {
+      // I.31 Draw BG through B ∥ CA, and FH through F ∥ DE
+      statement: 'Draw <strong>BG</strong> through <strong>B</strong> parallel to <strong>CA</strong>, and <strong>FH</strong> through <strong>F</strong> parallel to <strong>DE</strong>.',
+      reasonLabel: 'I.31',
+      kind: 'constr',
+      reason: 'Through a given point draw a straight line parallel to a given line.',
+      ensureVisible: () => {
+        Diagram.show('lineBG');
+        Diagram.show('lineFH');
+      },
+      highlights: [ { id: 'lineBG' }, { id: 'CA' }, { id: 'lineFH' }, { id: 'DE' } ],
+      coach: 'Each new line meets AD at G, H and sets up the opposite sides of the parallelograms.',
+      announce: ['line BG parallel CA', 'line FH parallel DE']
+    },
+    {
+      // I.36 Parallelograms GBCA and DEFH are equal
+      statement: 'Then each of the figures <strong>GBCA</strong> and <strong>DEFH</strong> is a parallelogram, and <strong>GBCA</strong> equals <strong>DEFH</strong> (equal bases, same parallels <strong>BF</strong> and <strong>GH</strong>).',
+      reasonLabel: 'I.36',
+      kind: 'prop',
+      reason: 'Parallelograms on equal bases in the same parallels are equal.',
+      ensureVisible: () => {
+        Diagram.show('paraGBCA');
+        Diagram.show('paraDEFH');
+      },
+      highlights: [ { id: 'paraGBCA', mode: 'para' }, { id: 'paraDEFH', mode: 'para' }, { id: 'lineBF' }, { id: 'lineAD' } ],
+      coach: 'We moved from triangles to parallelograms that share the same pair of parallels.',
+      announce: ['parallelogram GBCA', 'parallelogram DEFH']
+    },
+    {
+      // I.34 Triangles are halves via diagonals AB and DF
+      statement: 'Moreover, triangle <strong>ABC</strong> is half of parallelogram <strong>GBCA</strong> (diagonal <strong>AB</strong> bisects it), and triangle <strong>FED</strong> is half of parallelogram <strong>DEFH</strong> (diagonal <strong>DF</strong> bisects it).',
+      reasonLabel: 'I.34',
+      kind: 'prop',
+      reason: 'The diagonal of a parallelogram bisects it.',
+      ensureVisible: () => {
+        Diagram.show('paraGBCA'); Diagram.show('paraDEFH');
+        Diagram.show('diagAB');   Diagram.show('diagDF');
+      },
+      highlights: [
+        { id: 'paraGBCA', mode: 'para' }, { id: 'diagAB' },
+        { id: 'paraDEFH', mode: 'para' }, { id: 'diagDF' },
+        { id: 'AB', mode: 'tri' }, { id: 'CA', mode: 'tri' }, { id: 'DE', mode: 'tri' }, { id: 'DF', mode: 'tri' }
+      ],
+      coach: 'Equal wholes imply equal halves when cut by their diagonals.',
+      announce: ['diagonal AB', 'diagonal DF', 'triangles as halves of their parallelograms']
+    },
+    {
+      // C.N. Therefore triangles equal
+      statement: 'Therefore triangle <strong>ABC</strong> equals triangle <strong>DEF</strong>. Hence, triangles on equal bases and in the same parallels are equal.',
+      reasonLabel: 'C.N. / Q.E.D.',
+      kind: 'thus',
+      reason: '',
+      ensureVisible: () => { /* everything already visible */ },
+      highlights: [ { id: 'AB', mode: 'tri' }, { id: 'CA', mode: 'tri' }, { id: 'DE', mode: 'tri' }, { id: 'DF', mode: 'tri' } ],
+      onSelect: () => { // Add area hatch for emphasis
+        Diagram.addClass('triABC', 'pattern');
+        Diagram.addClass('triDEF', 'pattern');
+        // apply hatch fill via CSS override:
+        document.getElementById('AB')?.setAttribute('stroke-width','3');
+        document.getElementById('DF')?.setAttribute('stroke-width','3');
+        // We don’t actually fill the triangle path; we show hatch via class
+        // Add a small trick: overlay invisible polygons to carry the fill.
+        addTriangleHatch();
+      },
+      onDeselect: () => removeTriangleHatch(),
+      coach: 'Final step: equal parallelograms ⇒ equal halves ⇒ equal triangles.',
+      announce: ['triangle ABC equals triangle DEF']
+    }
+  ];
+
+  // Add/remove temporary hatch overlay polygons for triangles (purely visual)
+  function addTriangleHatch() {
+    if (document.getElementById('triABCfill')) return;
+    const svg = document.getElementById('diagram');
+    const triABCfill = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    triABCfill.setAttribute('id','triABCfill');
+    triABCfill.setAttribute('points','140,360 300,360 230,120');
+    triABCfill.setAttribute('fill','url(#hatch)');
+    triABCfill.setAttribute('opacity','0.25');
+
+    const triDEFfill = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+    triDEFfill.setAttribute('id','triDEFfill');
+    triDEFfill.setAttribute('points','520,360 680,360 610,120');
+    triDEFfill.setAttribute('fill','url(#hatch)');
+    triDEFfill.setAttribute('opacity','0.25');
+
+    // Insert above labels but after other shapes
+    svg.insertBefore(triABCfill, document.getElementById('labels'));
+    svg.insertBefore(triDEFfill, document.getElementById('labels'));
+  }
+  function removeTriangleHatch() {
+    document.getElementById('triABCfill')?.remove();
+    document.getElementById('triDEFfill')?.remove();
+  }
+
+  // -----------------------------
+  // iFrame height helper (non-breaking)
+  // -----------------------------
+  function postHeight() {
+    try {
+      const h = document.documentElement.scrollHeight;
+      parent.postMessage({ type: 'euclid-iframe-height', value: h }, '*');
+    } catch (e) { /* ignore */ }
+  }
+  window.addEventListener('resize', () => setTimeout(postHeight, 50));
+
+  // -----------------------------
+  // Init
+  // -----------------------------
+  window.addEventListener('DOMContentLoaded', () => {
+    // Render proof
+    (function renderProof() {
+      const tbody = document.getElementById('proof-body');
+      tbody.innerHTML = '';
+      PROOF.forEach((line, i) => {
+        const tr = document.createElement('tr');
+        tr.id = `line-${i}`;
+        tr.setAttribute('tabindex','0');
+        tr.setAttribute('role','row');
+        tr.innerHTML = `
+          <td role="cell"><div>${line.statement}</div></td>
+          <td role="cell"><span class="badge ${line.kind}">${line.reasonLabel}</span> ${line.reason || ''}</td>`;
+        tr.addEventListener('mouseenter', () => hover(i, true));
+        tr.addEventListener('mouseleave', () => hover(i, false));
+        tr.addEventListener('click', () => setActive(i));
+        tr.addEventListener('keydown', (e) => { if (e.key === 'Enter') setActive(i); });
+        tbody.appendChild(tr);
+      });
+    })();
+
+    // Bind controls
+    document.getElementById('btn-next').addEventListener('click', next);
+    document.getElementById('btn-prev').addEventListener('click', prev);
+    document.getElementById('btn-reset').addEventListener('click', reset);
+    document.getElementById('btn-play').addEventListener('click', togglePlay);
+    document.getElementById('btn-focus').addEventListener('click', toggleFocus);
+
+    // Keyboard
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'ArrowLeft') prev();
+      if (e.key.toLowerCase() === 'r') reset();
+      if (e.key === ' ') { e.preventDefault(); togglePlay(); }
+      if (e.key === 'Home') setActive(0);
+      if (e.key === 'End') setActive(PROOF.length - 1);
+    });
+
+    // Deep link (#line-N)
+    const m = location.hash.match(/line-(\d+)/);
+    if (m) setActive(parseInt(m[1],10));
+
+    updateCounter();
+    postHeight();
+  });
+
+  // Lightweight wrappers so we can use them above
+  function setActive(i){ Proof.setActive ? Proof.setActive(i) : _setActive(i); }
+  function hover(i, on){ Proof.hover ? Proof.hover(i,on) : _hover(i,on); }
+  function next(){ Proof.next ? Proof.next() : _next(); }
+  function prev(){ Proof.prev ? Proof.prev() : _prev(); }
+  function reset(){ Proof.reset ? Proof.reset() : _reset(); }
+  function togglePlay(){ Proof.togglePlay ? Proof.togglePlay() : null; }
+  function toggleFocus(){ // toggle focus mode
+    const svg = document.getElementById('diagram');
+    const btn = document.getElementById('btn-focus');
+    const on = !svg.classList.contains('focusless');
+    svg.classList.toggle('focusless', on);
+    btn.textContent = on ? '☾ Unfocus' : '☼ Focus';
+  }
+  function updateCounter(){
+    const counter = document.getElementById('step-counter');
+    if (!counter) return;
+    // crude but fine: count rows and hash
+    const rows = document.querySelectorAll('#proof-body tr');
+    const m = location.hash.match(/line-(\d+)/);
+    const idx = m ? parseInt(m[1],10) : -1;
+    if (idx < 0) { counter.textContent = `0 of ${rows.length}`; return; }
+    counter.textContent = `${idx + 1} of ${rows.length}`;
+  }
+
+  // Fallback simple implementations (if Proof object not used)
+  function _setActive(){/* no-op */}
+  function _hover(){/* no-op */}
+  function _next(){/* no-op */}
+  function _prev(){/* no-op */}
+  function _reset(){/* no-op */}
+
+  // Re-implement Proof methods inline (no external file)
+  (function attachProofInline(){
+    const state = { current:-1, autoplay:null };
+
+    Proof.setActive = function(index){
+      if (index < 0 || index >= PROOF.length) return;
+      // deselect
+      if (state.current >= 0) {
+        PROOF[state.current].onDeselect?.();
+        document.getElementById(`line-${state.current}`)?.classList.remove('active');
+      }
+      Diagram.clearHighlights();
+      state.current = index;
+
+      const row = document.getElementById(`line-${index}`);
+      row?.classList.add('active');
+
+      PROOF[index].ensureVisible?.();
+
+      const ids = PROOF[index].highlights || [];
+      ids.forEach(({ id, mode }) => {
+        const cls = mode === 'para' ? 'hl-parallelogram' : (mode === 'tri' ? 'hl-triangle' : 'hl-strong');
+        Diagram.addClass(id, 'highlight', cls);
+      });
+
+      PROOF[index].onSelect?.();
+
+      document.getElementById('coach').textContent = PROOF[index].coach || '';
+      const s = (PROOF[index].announce || []).join(', ');
+      document.getElementById('live').textContent = s ? `Highlighting ${s}.` : '';
+
+      location.hash = `line-${index}`;
+      document.getElementById(`line-${index}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+      // Update counter buttons
+      const counter = document.getElementById('step-counter');
+      counter.textContent = `${index + 1} of ${PROOF.length}`;
+      document.getElementById('btn-prev').disabled = index <= 0;
+      document.getElementById('btn-next').disabled = index >= PROOF.length - 1;
+
+      postHeight();
+    };
+    Proof.next = () => Proof.setActive(Math.min(state.current + 1, PROOF.length - 1));
+    Proof.prev = () => Proof.setActive(Math.max(state.current - 1, 0));
+    Proof.reset = () => {
+      state.current = -1;
+      Diagram.reset();
+      document.querySelectorAll('#proof-body tr').forEach(tr => tr.classList.remove('active'));
+      document.getElementById('coach').textContent = '';
+      document.getElementById('live').textContent = '';
+      document.getElementById('step-counter').textContent = `0 of ${PROOF.length}`;
+      location.hash = '';
+      postHeight();
+    };
+    Proof.togglePlay = () => {
+      if (state.autoplay) { clearInterval(state.autoplay); state.autoplay = null; document.getElementById('btn-play').textContent='▶ Play'; return; }
+      state.autoplay = setInterval(() => {
+        if (state.current >= PROOF.length - 1) { clearInterval(state.autoplay); state.autoplay = null; document.getElementById('btn-play').textContent='▶ Play'; return; }
+        Proof.next();
+      }, 1600);
+      document.getElementById('btn-play').textContent='⏸ Pause';
+    };
+  })();
+</script>
+</body>
+</html>
