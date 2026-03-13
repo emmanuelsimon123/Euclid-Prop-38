@@ -52,7 +52,23 @@
       100%{transform:translate(-50%,-50%) scale(1) rotate(-10deg);opacity:1}
     }
 
-    .legend{font-size:.9rem;margin-top:.4rem;color:var(--muted)}
+    /* TEACHER CALLOUT BOX - TIGHTENED UP TO ACT AS A CAPTION */
+    .coach-box {
+      margin-top: 0.5rem;
+      padding: 0.85rem 1rem;
+      background: #eff6ff;
+      border-left: 4px solid var(--accent);
+      border-radius: 4px;
+      font-size: 1.05rem;
+      color: #1e3a8a;
+      line-height: 1.4;
+      min-height: 3.5rem;
+      display: flex;
+      align-items: center;
+    }
+
+    .legend{font-size:.9rem;margin-bottom:.6rem;color:var(--muted)}
+    
     .steps{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:1rem}
     .guiding{background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:.75rem .9rem;margin-bottom:1rem}
     .guiding h2{margin:.2rem 0 .4rem;font-size:1.05rem}
@@ -95,6 +111,8 @@
     .hl-parallelogram{stroke:var(--accent-2)!important;stroke-width:4!important;fill:rgba(217,119,6,.08)!important}
     .hl-tri{stroke:var(--good)!important;stroke-width:4!important;fill:rgba(22,163,74,.10)!important}
 
+    .as-diagonal{stroke:#64748b!important;stroke-dasharray:6 6!important;stroke-width:2.5!important}
+
     /* Optimized Focus Mode */
     svg.focusless g, svg.focusless line, svg.focusless polygon, svg.focusless circle, svg.focusless text {opacity:.15;transition:opacity .3s}
     svg.focusless .highlight, svg.focusless .draw-solid{opacity:1!important}
@@ -129,6 +147,10 @@
 
     <div class="progress-container">
       <div id="progress-bar" class="progress-bar"></div>
+    </div>
+
+    <div class="legend">
+      Tip: Click a proof line to highlight the referenced figure. Use <strong>☼ Focus</strong> to dim non‑relevant parts.
     </div>
 
     <div class="svg-wrapper">
@@ -195,10 +217,9 @@
       <div id="qed-stamp" class="qed-stamp hidden">Q.E.D.</div>
     </div>
 
-    <div class="legend">
-      Tip: Click a proof line to highlight the referenced figure. Use <strong>☼ Focus</strong> to dim non‑relevant parts.
-    </div>
-
+    <!-- Teacher Coach Box now sits directly under the SVG diagram -->
+    <div id="coach" class="coach-box">Select a step in the proof to see the teacher's notes here.</div>
+    
     <div id="live" aria-live="polite" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;"></div>
   </section>
 
@@ -229,7 +250,6 @@
         </thead>
         <tbody id="proof-body" role="rowgroup"></tbody>
       </table>
-      <div id="coach" class="muted" style="margin-top:.5rem;font-style:italic;font-weight:500;"></div>
     </div>
   </section>
 </main>
@@ -404,7 +424,7 @@
         { id: 'BC' }, { id: 'EF' }, { id: 'tickBC' }, { id: 'tickEF' },
         { id: 'lineBF' }, { id: 'lineAD' }
       ],
-      coach: 'Equal bases + same parallels gives equal parallelogram areas.',
+      coach: 'Equal bases and same parallels gives equal parallelogram areas.',
       announce: ['parallelograms GBCA and DEFH']
     },
     {
@@ -488,7 +508,7 @@
       });
       PROOF[index].onSelect?.();
 
-      document.getElementById('coach').textContent = PROOF[index].coach || '';
+      document.getElementById('coach').innerHTML = PROOF[index].coach || '<em>No notes for this step.</em>';
       const s = (PROOF[index].announce || []).filter(Boolean).join(', ');
       document.getElementById('live').textContent = s ? `Highlighting ${s}.` : '';
 
@@ -512,7 +532,7 @@
       stop();
       Diagram.reset();
       document.querySelectorAll('#proof-body tr').forEach(tr => tr.classList.remove('active'));
-      document.getElementById('coach').textContent = '';
+      document.getElementById('coach').innerHTML = 'Select a step in the proof to see the teacher\'s notes here.';
       document.getElementById('live').textContent = '';
       document.getElementById('step-counter').textContent = `Step 0 of ${PROOF.length}`;
       document.getElementById('progress-bar').style.width = `0%`;
@@ -534,7 +554,7 @@
       autoplay = setInterval(() => {
         if (current >= PROOF.length - 1) { stop(); return; }
         next();
-      }, 2500);
+      }, 3000); 
 
       const btn = document.getElementById('btn-play');
       btn.textContent = '⏸ Pause';
